@@ -1,0 +1,9 @@
+node_modules/
+.DS_Store
+.vscode/
+package-lock.json
+deno.lock
+Icon?
+cookies_screenshot.png
+urls.json
+*.log

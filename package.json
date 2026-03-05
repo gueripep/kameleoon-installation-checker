@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "check-engine": "node src/engine-checker/engine-checker.mjs"
+  },
+  "dependencies": {
+    "puppeteer": "^23.0.2"
+  }
+}
