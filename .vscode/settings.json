@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^echo \"\" \\| node check-cookies\\.mjs$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

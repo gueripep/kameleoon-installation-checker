@@ -1,8 +1,24 @@
 {
+  "name": "kameleoon-installation-checker",
+  "version": "1.0.0",
+  "private": true,
   "scripts": {
-    "check-engine": "node src/engine-checker/engine-checker.mjs"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
   },
   "dependencies": {
-    "puppeteer": "^23.0.2"
+    "next": "16.1.6",
+    "puppeteer": "^24.38.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "babel-plugin-react-compiler": "1.0.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "tailwindcss": "^4"
   }
 }
