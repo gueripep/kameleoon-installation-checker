@@ -27,7 +27,7 @@ const evasions = [
  * Instead of letting puppeteer-extra dynamically require the evasions,
  * we manually register them.
  */
-module.exports = function useStealth(puppeteerInstance) {
+module.exports = function applyStealthPlugin(puppeteerInstance) {
     // 1. Use the main stealth plugin (with evasions disabled to avoid dynamic require in puppeteer-extra)
     // We pass it in the options so it's set BEFORE puppeteer-extra checks dependencies
     const stealth = StealthPlugin({
