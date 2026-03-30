@@ -1,10 +1,11 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import puppeteer from 'puppeteer-extra';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const useStealth = require('../../../lib/puppeteer-stealth.cjs');
+const applyStealthPlugin = require('../../../lib/puppeteer-stealth.cjs');
 
-useStealth(puppeteer);
+applyStealthPlugin(puppeteer);
 
 function normalizeUrl(url) {
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
