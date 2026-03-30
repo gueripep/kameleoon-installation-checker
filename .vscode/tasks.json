@@ -1,0 +1,15 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "npm run dev",
+      "type": "npm",
+      "script": "dev",
+      "problemMatcher": [],
+      "group": "none",
+      "runOptions": {
+        "runOn": "folderOpen"
+      }
+    }
+  ]
+}

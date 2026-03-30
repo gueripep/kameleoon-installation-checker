@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-extra';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const useStealth = require('../../../lib/puppeteer-stealth.cjs');
+
+useStealth(puppeteer);
 
 function normalizeUrl(url) {
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
@@ -22,10 +27,15 @@ export async function POST(request) {
 
         browser = await puppeteer.launch({
             headless: 'new',
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
-                '--disable-blink-features=AutomationControlled'
+                '--disable-blink-features=AutomationControlled',
+                '--disable-infobars',
+                '--window-position=0,0',
+                '--ignore-certifcate-errors',
+                '--ignore-certifcate-errors-spki-list',
             ]
         });
 
@@ -45,6 +55,23 @@ export async function POST(request) {
                 await dialog.accept(credentials.password);
             } else {
                 await dialog.dismiss();
+            }
+        });
+
+        const itpChecks = [];
+        page.on('response', response => {
+            try {
+                const headers = response.headers();
+                const setCookie = headers['set-cookie'];
+                if (setCookie && setCookie.includes('kameleoonVisitorCode')) {
+                    itpChecks.push({
+                        url: response.url(),
+                        cookie: setCookie,
+                        status: response.status()
+                    });
+                }
+            } catch (e) {
+                // Ignore errors for some responses
             }
         });
 
@@ -285,7 +312,11 @@ export async function POST(request) {
             debugInfo: domTests.debugInfo,
             tests: domTests.tests,
             performance: performanceMetrics,
-            apiChecks
+            apiChecks,
+            itpCheck: {
+                pass: itpChecks.length > 0,
+                details: itpChecks
+            }
         });
 
     } catch (error) {
