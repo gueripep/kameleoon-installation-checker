@@ -1,11 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
-import puppeteer from 'puppeteer-extra';
 import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const applyStealthPlugin = require('../../../lib/puppeteer-stealth.cjs');
-
-applyStealthPlugin(puppeteer);
 
 function normalizeUrl(url) {
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
@@ -14,7 +9,18 @@ function normalizeUrl(url) {
     return url;
 }
 
+let isInitialized = false;
+
 export async function POST(request) {
+    const require = createRequire(import.meta.url);
+    const puppeteer = require('puppeteer-extra');
+    const applyStealthPlugin = require('../../../lib/puppeteer-stealth.cjs');
+
+    if (!isInitialized) {
+        applyStealthPlugin(puppeteer);
+        isInitialized = true;
+    }
+
     let browser = null;
     try {
         const body = await request.json();
