@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kameleoon Checker</title>
+    <link rel="stylesheet" href="popup.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+                <h1>Kameleoon Checker</h1>
+            </div>
+            <button id="runCheckBtn" class="primary-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l5.64-4.21"/>
+                </svg>
+                Run Clean Check
+            </button>
+        </header>
+
+        <main id="resultsContainer">
+            <div class="placeholder active" id="placeholder">
+                <p>Click "Run Clean Check" to clear site data and test this page.</p>
+            </div>
+            
+            <div id="loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Loading and checking...</p>
+            </div>
+
+            <div id="results" class="results hidden">
+                <div class="summary-card">
+                    <h2 id="overallStatus">Installation Status</h2>
+                    <p id="testUrl" class="url-text"></p>
+                </div>
+                
+                <div class="sections-container" id="sectionsContainer">
+                    <!-- Sections will be injected here -->
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>
