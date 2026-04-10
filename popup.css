@@ -186,6 +186,13 @@ main {
     padding: 12px 16px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     gap: 12px;
+    border-left: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.test-item:hover {
+    background-color: rgba(255, 255, 255, 0.02);
+    border-left-color: var(--primary);
 }
 
 .test-item:last-child {
@@ -233,6 +240,14 @@ main {
     color: var(--text-secondary);
     word-break: break-word;
     line-height: 1.4;
+}
+
+/* Performance specific styling */
+.performance-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
 }
 
 .csp-missing-list {

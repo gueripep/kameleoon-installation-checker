@@ -408,6 +408,9 @@ function runPerformanceTests() {
     return {
         duration: Math.round(resourceTiming.duration || 0),
         responseEnd: Math.round(resourceTiming.responseEnd || 0),
-        startTime: Math.round(resourceTiming.startTime || 0)
+        startTime: Math.round(resourceTiming.startTime || 0),
+        requestStart: Math.round(resourceTiming.requestStart || 0),
+        responseStart: Math.round(resourceTiming.responseStart || 0),
+        fetchStart: Math.round(resourceTiming.fetchStart || 0)
     };
 }

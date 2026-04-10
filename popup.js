@@ -233,13 +233,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 5. Performance
         if (data.performanceData) {
+            const perf = data.performanceData;
+            const startedAt = perf.requestStart || perf.fetchStart || perf.startTime;
+            const totalTime = Math.round(perf.responseEnd);
+
             const perfTests = [
                 {
-                    pass: data.performanceData.duration < 1000,
-                    text: `engine.js loaded in ${data.performanceData.duration}ms`,
-                    debug: data.performanceData.duration >= 1000 ? 'Performance is suboptimal (>1000ms)' : ''
+                    pass: totalTime < 1000,
+                    text: `engine.js ready at ${totalTime}ms`,
+                    debug: `Started at ${startedAt}ms, Network duration: ${perf.duration}ms. ${totalTime >= 1000 ? 'Warning: Engine loaded too late (>1000ms).' : 'Fast engine initialization.'}`
                 }
             ];
+
             sectionsContainer.appendChild(createSection('Performance', perfTests, item => item.text, item => item.pass ? 'pass' : 'warning', item => item.debug));
         }
 
