@@ -1,31 +1,34 @@
-# Kameleoon Installation Validator (v2 Next.js)
+# Kameleoon Installation Validator (Chrome Extension)
 
-An aesthetic, powerful Next.js web application designed to automatically test and validate Kameleoon script deployments across web applications.
+An aesthetic, powerful Chrome extension designed to automatically test and validate Kameleoon script deployments directly in the browser.
 
 ## Features
-- **Engine Checker**: Bulk analyze multiple URLs to detect the presence of `engine.js` vs `kameleoon.js`.
-- **Installation Validation**: Perform deep diagnostic checks on a single URL including CSP Header analysis, Anti-Flicker snippet validation, execution permissions, and loading performance.
+- **Auto-Detection**: Automatically detects if `engine.js` or `kameleoon.js` is loaded on the current page.
+- **Deep Diagnostic**: Performs comprehensive checks including:
+    - **CSP Header Analysis**: Checks if Content Security Policy allows Kameleoon domains.
+    - **Anti-Flicker Snipet Validation**: Verifies the presence and correctness of the anti-flicker snippet.
+    - **Execution Permissions**: Checks if `eval()` and other necessary permissions are enabled.
+    - **Performance Tracking**: Measures how quickly the Kameleoon script loads.
+- **Visual Feedback**: Clean, premium popup interface with pass/fail indicators and debug information.
 
-## Getting Started
+## Installation (Development Mode)
 
-### Prerequisites
-- Node.js (v18+)
-- A local browser installation (Chromium/Puppeteer drops in automatically on `npm install`)
+1. Clone or download this repository.
+2. Open Chrome and navigate to `chrome://extensions/`.
+3. Enable **Developer mode** in the top right corner.
+4. Click **Load unpacked** and select the root directory of this project.
 
-### Setup
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+## Usage
 
-### Running the App Locally
+1. Navigate to any website you want to test.
+2. Click the Kameleoon icon in your Chrome extensions bar.
+3. Click "Run Installation Check".
+4. The extension will refresh the page and perform a series of tests, presenting the results in the popup.
 
-To start the development server, run:
-```bash
-npm run dev
-```
+## Technical Details
 
-Then open `http://localhost:3000` in your browser.
-
-> **Note on deployment:** This application uses Puppeteer under the hood. If deploying to Vercel/Serverless Edge architectures, you must configure a remote Chromium instance (like Browserless.io) due to the strict lambda package size limits. Running it locally via `npm run dev` or a traditional Dockerized Node.js environment is recommended.
+- **manifest.json**: Extension configuration (V3).
+- **background.js**: Manages messaging and state preservation during page reloads.
+- **content.js**: Executes DOM-based tests on the target website.
+- **inject.js**: Injected into the page to access the global `Kameleoon` object.
+- **popup.html/css/js**: The user interface for the extension.
