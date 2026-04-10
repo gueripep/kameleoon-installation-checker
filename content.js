@@ -16,7 +16,8 @@ let finalReport = {
     domData: [],
     performanceData: null,
     cspData: null,
-    consentData: null
+    consentData: null,
+    itpData: null
 };
 
 // Logic to run on page load
@@ -55,6 +56,7 @@ window.addEventListener('message', async function(event) {
 
     if (event.data.type === 'KAMELEOON_CONSENT_DATA') {
         finalReport.consentData = event.data.payload;
+        checkItp();
         saveReport();
     } else if (event.data.type === 'KAMELEOON_API_DATA') {
         // Clear timeout as we found it!
@@ -64,6 +66,9 @@ window.addEventListener('message', async function(event) {
         finalReport.domData = runDomTests();
         finalReport.performanceData = runPerformanceTests();
         finalReport.cspData = await runCspTests();
+        
+        await checkItp();
+
         finalReport.timestamp = Date.now();
         saveReport();
         
@@ -75,6 +80,29 @@ window.addEventListener('message', async function(event) {
 function saveReport() {
     chrome.storage.local.set({ lastTestResults: finalReport });
 }
+
+async function checkItp() {
+    const storageData = await new Promise(resolve => chrome.storage.local.get(['itpWorkarounds'], resolve));
+    const origin = window.location.origin;
+    if (storageData.itpWorkarounds && storageData.itpWorkarounds[origin]) {
+        const itpData = storageData.itpWorkarounds[origin];
+        const wasTrueOnLoad = finalReport.consentData ? (finalReport.consentData.wasTrueOnLoad.experiment || finalReport.consentData.wasTrueOnLoad.personalization || finalReport.consentData.wasTrueOnLoad.recommendation) : false;
+        
+        const tooEarly = itpData.detections.some(d => d.type === 'main_frame' && !wasTrueOnLoad);
+        
+        finalReport.itpData = {
+            ...itpData,
+            status: tooEarly ? 'privacy_risk' : 'compliant'
+        };
+    }
+}
+
+// Monitor storage for new ITP detections from background script
+chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.itpWorkarounds) {
+        checkItp().then(() => saveReport());
+    }
+});
 
 
 function runDomTests() {

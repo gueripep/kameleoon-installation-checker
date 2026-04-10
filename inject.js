@@ -53,7 +53,10 @@
     let lastConsent = {
         experiment: null,
         personalization: null,
-        recommendation: null
+        recommendation: null,
+        cookieFound: false,
+        cookieCount: null,
+        initialized: false
     };
     let wasTrueOnLoad = {
         experiment: false,
@@ -65,6 +68,32 @@
         personalization: null,
         recommendation: null
     };
+    let consentTimestamps = {
+        experiment: null,
+        personalization: null,
+        recommendation: null
+    };
+
+    let cookieFoundOnLoad = false;
+    let cookieCurrentlyFound = false;
+    let cookieFoundAtTime = null;
+    let cookieCount = 0;
+
+    function checkCookie() {
+        const cookies = document.cookie.split(';');
+        const visitorCookies = cookies.filter(c => c.trim().startsWith('kameleoonVisitorCode='));
+        const found = visitorCookies.length > 0;
+        cookieCount = visitorCookies.length;
+
+        if (firstCheck) {
+            cookieFoundOnLoad = found;
+        }
+        if (found && !cookieCurrentlyFound) {
+            cookieFoundAtTime = Math.round((Date.now() - loadTime) / 1000);
+        }
+        cookieCurrentlyFound = found;
+        return found;
+    }
 
     function getConsentData() {
         const visitor = window.Kameleoon?.API?.Visitor;
@@ -78,6 +107,13 @@
             wasTrueOnLoad.experiment = current.experiment;
             wasTrueOnLoad.personalization = current.personalization;
             wasTrueOnLoad.recommendation = current.recommendation;
+            // No need to set firstCheck = false here yet, we'll do it at the end of the loop iteration if needed
+        }
+        
+        // Also check cookie
+        checkCookie();
+
+        if (firstCheck) {
             firstCheck = false;
         }
 
@@ -85,6 +121,7 @@
         ['experiment', 'personalization', 'recommendation'].forEach(key => {
             if (current[key] && !lastConsent[key] && !wasTrueOnLoad[key]) {
                 consentTimes[key] = Math.round((Date.now() - loadTime) / 1000);
+                consentTimestamps[key] = Date.now();
             }
         });
 
@@ -94,19 +131,35 @@
     function sendConsentUpdate() {
         const currentConsent = getConsentData();
         
-        // Only send if changed or it's the first check
-        if (currentConsent.experiment !== lastConsent.experiment || 
-            currentConsent.personalization !== lastConsent.personalization || 
-            currentConsent.recommendation !== lastConsent.recommendation) {
+        // Only send if changed OR it's a cookie detection OR it's the very first report
+        const consentChanged = currentConsent.experiment !== lastConsent.experiment || 
+                              currentConsent.personalization !== lastConsent.personalization || 
+                              currentConsent.recommendation !== lastConsent.recommendation ||
+                              cookieCount !== lastConsent.cookieCount;
+        
+        // We always send the first one, then only on changes
+        if (consentChanged || (cookieCurrentlyFound && !lastConsent.cookieFound) || !lastConsent.initialized) {
             
-            lastConsent = { ...currentConsent };
+            lastConsent = { 
+                ...currentConsent, 
+                cookieFound: cookieCurrentlyFound,
+                cookieCount: cookieCount,
+                initialized: true
+            };
             
             window.postMessage({
                 type: 'KAMELEOON_CONSENT_DATA',
                 payload: {
                     current: currentConsent,
                     wasTrueOnLoad: wasTrueOnLoad,
-                    consentTimes: consentTimes
+                    consentTimes: consentTimes,
+                    consentTimestamps: consentTimestamps,
+                    cookieData: {
+                        foundOnLoad: cookieFoundOnLoad,
+                        currentlyFound: cookieCurrentlyFound,
+                        foundAtTime: cookieFoundAtTime,
+                        count: cookieCount
+                    }
                 }
             }, '*');
         }

@@ -43,11 +43,11 @@ document.addEventListener('DOMContentLoaded', () => {
         runBtn.disabled = true;
 
         if (loadingInterval) clearInterval(loadingInterval);
-        
+
         loadingInterval = setInterval(() => {
             const now = Date.now();
             const elapsed = Math.floor((now - (startTime || now)) / 1000);
-            
+
             if (elapsed > 1.5) {
                 loadingText.textContent = "Scanning page...";
                 searchingStatus.textContent = `Searching for Kameleoon engine (${elapsed}s elapsed)...`;
@@ -103,10 +103,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const isCurrentlyTrue = data.consentData.current[test.key];
                 const wasTrueOnLoad = data.consentData.wasTrueOnLoad[test.key];
                 const timeTaken = data.consentData.consentTimes[test.key];
-                
+
                 let status = 'warning';
                 let debug = 'Waiting for consent...';
-                
+
                 if (wasTrueOnLoad) {
                     status = 'fail';
                     debug = 'Consent was already granted on load (GDPR risk)';
@@ -115,33 +115,123 @@ document.addEventListener('DOMContentLoaded', () => {
                     debug = `Consent granted correctly after ${timeTaken}s`;
                 }
 
-                
+
                 return {
                     status,
                     text: test.text,
                     debug
                 };
             });
-            
+
+            // Add JS Cookie Access check
+            if (data.consentData.cookieData) {
+                const cookieData = data.consentData.cookieData;
+                let cookieStatus = 'warning';
+                let cookieDebug = 'Waiting for consent...';
+
+                if (cookieData.foundOnLoad) {
+                    cookieStatus = 'fail';
+                    cookieDebug = 'Privacy Risk: Cookie was accessible in JS BEFORE consent was provided.';
+                } else if (cookieData.currentlyFound) {
+                    cookieStatus = 'pass';
+                    cookieDebug = `Cookie became accessible in JS after ${cookieData.foundAtTime}s (Compliant)`;
+                } else {
+                    const anyConsent = data.consentData.current.experiment || data.consentData.current.personalization || data.consentData.current.recommendation;
+                    if (anyConsent) {
+                        cookieStatus = 'pass';
+                        cookieDebug = 'No kameleoonVisitorCode cookies accessible in JavaScript (Expected if using HttpOnly ITP workaround)';
+                    }
+                }
+
+                consentTests.push({
+                    status: cookieStatus,
+                    text: 'Cookie Access',
+                    debug: cookieDebug
+                });
+            }
+
             sectionsContainer.appendChild(createSection('Legal Consent Check', consentTests, item => item.text, item => item.status, item => item.debug));
         }
 
+        // 2. ITP Workaround (Moved up)
+        let itpStatus = 'warning';
+        let itpDebug = 'The kameleoonVisitorCode was NOT detected in any Set-Cookie headers. This may cause cookie expiration issues in Safari.';
 
-        // 2. API Data
+        const isFreshReport = (Date.now() - data.timestamp) < 10000;
+
+        if (data.itpData) {
+            if (data.itpData.status === 'privacy_risk') {
+                itpStatus = 'fail';
+                itpDebug = 'Privacy Risk: The cookie was set on the initial page load BEFORE consent was provided. This is a GDPR/Privacy compliance issue.';
+            } else if (data.itpData.status === 'compliant') {
+                itpStatus = 'pass';
+                itpDebug = 'The kameleoonVisitorCode was successfully detected in Set-Cookie headers and is compliant with consent requirements.';
+            }
+        } else if (isFreshReport) {
+            itpDebug = 'Waiting for consent...';
+        }
+
+        const itpTests = [
+            {
+                status: itpStatus,
+                text: 'ITP Workaround (Set-Cookie)',
+                debug: itpDebug
+            }
+        ];
+
+        // Only show Single Cookie Check after consent and ITP compliance
+        if (data.consentData?.current?.experiment && data.itpData?.status === 'compliant') {
+            const consentTimestamp = data.consentData.consentTimestamps?.experiment;
+            const now = Date.now();
+            const timeSinceConsent = consentTimestamp ? (now - consentTimestamp) : Infinity;
+
+            let cookieCountStatus = 'pass';
+            let cookieCountDebug = 'Only one kameleoonVisitorCode cookie detected.';
+
+            if (timeSinceConsent < 2000) {
+                cookieCountStatus = 'warning';
+                cookieCountDebug = 'Waiting for cookies to stabilize...';
+                // Trigger a re-render once the delay has passed
+                setTimeout(() => {
+                    chrome.storage.local.get(['lastTestResults'], (res) => {
+                        if (res.lastTestResults) showResults(res.lastTestResults);
+                    });
+                }, 2000 - timeSinceConsent + 100);
+            } else {
+                const cookieCount = data.consentData.cookieData?.count || 0;
+                if (cookieCount > 1) {
+                    cookieCountStatus = 'fail';
+                    cookieCountDebug = `Found ${cookieCount} kameleoonVisitorCode cookies! This creates a conflict and is usually caused by incorrect Set-Cookie Domain flags across subdomains.`;
+                } else if (cookieCount === 0) {
+                    cookieCountStatus = 'warning';
+                    cookieCountDebug = 'No kameleoonVisitorCode cookies found in JavaScript. This is normal if the cookie is set with the HttpOnly flag.';
+                }
+            }
+
+            itpTests.push({
+                status: cookieCountStatus,
+                text: 'Single Cookie Check',
+                debug: cookieCountDebug
+            });
+        }
+
+        sectionsContainer.appendChild(createSection('ITP Workaround', itpTests, item => item.text, item => item.status, item => item.debug));
+
+        // 3. API Data
         if (data.apiData && data.apiData.length > 0) {
             sectionsContainer.appendChild(createSection('Kameleoon API', data.apiData, item => item.message, item => item.pass ? 'pass' : 'fail', item => ''));
         }
 
-        // 3. DOM Tests
+        // 4. DOM Tests
         if (data.domData && data.domData.length > 0) {
-            sectionsContainer.appendChild(createSection('DOM Implementation', data.domData, 
-                item => item.pass ? item.pass : item.fail, 
-                item => item.test ? 'pass' : (item.warning ? 'warning' : 'fail'), 
+            sectionsContainer.appendChild(createSection('DOM Implementation', data.domData,
+                item => item.pass ? item.pass : item.fail,
+                item => item.test ? 'pass' : (item.warning ? 'warning' : 'fail'),
                 item => item.debug || ''
             ));
         }
 
-        // 4. Performance
+        // 5. Performance
         if (data.performanceData) {
             const perfTests = [
                 {
@@ -153,7 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sectionsContainer.appendChild(createSection('Performance', perfTests, item => item.text, item => item.pass ? 'pass' : 'warning', item => item.debug));
         }
 
-        // 5. CSP
+        // 6. CSP
         if (data.cspData) {
             if (data.cspData.noCsp) {
                 const cspTests = [{ pass: true, text: 'No CSP detected on this page', debug: 'Site is not restricting resources via CSP.' }];
@@ -194,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function createSection(title, items, getText, getStatus, getDebug) {
         const section = document.createElement('div');
         section.className = 'section';
-        
+
         const header = document.createElement('div');
         header.className = 'section-header';
         header.textContent = title;
