@@ -9,37 +9,47 @@ function injectScript(file_path, node) {
     th.appendChild(s);
 }
 
+let finalReport = {
+    timestamp: null,
+    url: window.location.href,
+    apiData: [],
+    domData: [],
+    performanceData: null,
+    cspData: null,
+    consentData: null
+};
+
 // Setup a listener for messages from the injected script
 window.addEventListener('message', async function(event) {
     // We only accept messages from ourselves
-    if (event.source !== window || !event.data || event.data.type !== 'KAMELEOON_API_DATA') {
+    if (event.source !== window || !event.data) {
         return;
     }
-    
-    const apiData = event.data.payload;
-    const domData = runDomTests();
-    const performanceData = runPerformanceTests();
-    const cspData = await runCspTests();
 
-    // Package everything and store it
-    const finalReport = {
-        timestamp: Date.now(),
-        url: window.location.href,
-        apiData,
-        domData,
-        performanceData,
-        cspData
-    };
-
-    chrome.storage.local.set({ lastTestResults: finalReport }, () => {
+    if (event.data.type === 'KAMELEOON_CONSENT_DATA') {
+        finalReport.consentData = event.data.payload;
+        saveReport();
+    } else if (event.data.type === 'KAMELEOON_API_DATA') {
+        finalReport.apiData = event.data.payload;
+        finalReport.domData = runDomTests();
+        finalReport.performanceData = runPerformanceTests();
+        finalReport.cspData = await runCspTests();
+        finalReport.timestamp = Date.now();
+        saveReport();
+        
         // Clear pending check if exists
         chrome.storage.local.get(['pendingCheck'], (data) => {
             if (data.pendingCheck && data.pendingCheck === window.location.origin) {
                 chrome.storage.local.remove(['pendingCheck', 'checkTimestamp']);
             }
         });
-    });
+    }
 });
+
+function saveReport() {
+    chrome.storage.local.set({ lastTestResults: finalReport });
+}
+
 
 function runDomTests() {
     const kameleoonSnippet = document.querySelector('script[src*="engine.js"]') || document.querySelector('script[src*="kameleoon.js"]');

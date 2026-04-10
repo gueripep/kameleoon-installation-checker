@@ -212,6 +212,12 @@ main {
     color: var(--error);
 }
 
+.test-icon.warning {
+    background-color: var(--warning-bg);
+    color: var(--warning);
+}
+
+
 .test-content {
     flex-grow: 1;
 }
