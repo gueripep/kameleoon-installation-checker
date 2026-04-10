@@ -225,4 +225,26 @@ main {
 .test-debug {
     font-size: 12px;
     color: var(--text-secondary);
+    word-break: break-word;
+    line-height: 1.4;
+}
+
+.csp-missing-list {
+    margin-top: 6px;
+    margin-bottom: 0;
+    padding-left: 16px;
+    list-style-type: disc;
+}
+
+.csp-missing-list li {
+    margin-bottom: 4px;
+}
+
+.csp-missing-list li:last-child {
+    margin-bottom: 0;
+}
+
+.csp-missing-list strong {
+    color: var(--text-primary);
+    font-weight: 500;
 }

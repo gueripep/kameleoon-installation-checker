@@ -67,6 +67,28 @@ document.addEventListener('DOMContentLoaded', () => {
             ];
             sectionsContainer.appendChild(createSection('Performance', perfTests, item => item.text, item => item.pass, item => item.debug));
         }
+
+        // 4. CSP
+        if (data.cspData) {
+            if (data.cspData.noCsp) {
+                const cspTests = [{ pass: true, text: 'No CSP detected on this page', debug: 'Site is not restricting resources via CSP.' }];
+                sectionsContainer.appendChild(createSection('CSP Configuration', cspTests, item => item.text, item => item.pass, item => item.debug));
+            } else if (data.cspData.results) {
+                const cspTests = data.cspData.results.map(res => {
+                    let debugMsg = 'All required domains whitelisted';
+                    if (!res.pass && res.missing && res.missing.length > 0) {
+                        const missingHtml = res.missing.map(m => `<li><strong>${m.domain}</strong>: ${m.description}</li>`).join('');
+                        debugMsg = `Missing Rules:<ul class="csp-missing-list">${missingHtml}</ul>`;
+                    }
+                    return {
+                        pass: res.pass,
+                        text: `${res.directive}`,
+                        debug: debugMsg
+                    };
+                });
+                sectionsContainer.appendChild(createSection('CSP Configuration', cspTests, item => item.text, item => item.pass, item => item.debug));
+            }
+        }
     }
 
     function getPassIcon() {
