@@ -254,3 +254,17 @@ main {
     color: var(--text-primary);
     font-weight: 500;
 }
+
+.status-detail {
+    margin-top: 8px;
+    font-style: italic;
+    color: var(--primary-color) !important;
+    font-size: 0.85rem !important;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}

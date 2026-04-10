@@ -5,11 +5,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultsContainer = document.getElementById('results');
     const testUrl = document.getElementById('testUrl');
     const sectionsContainer = document.getElementById('sectionsContainer');
+    const searchingStatus = document.getElementById('searchingStatus');
+    const loadingText = document.getElementById('loadingText');
 
     function checkState() {
-        chrome.storage.local.get(['pendingCheck', 'lastTestResults'], (data) => {
+        chrome.storage.local.get(['pendingCheck', 'checkTimestamp', 'lastTestResults'], (data) => {
             if (data.pendingCheck) {
-                showLoading();
+                showLoading(data.checkTimestamp);
             } else if (data.lastTestResults) {
                 showResults(data.lastTestResults);
             } else {
@@ -20,20 +22,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Listen for storage changes to update UI in real-time
     chrome.storage.onChanged.addListener((changes, area) => {
-        if (area === 'local' && changes.lastTestResults) {
-            showResults(changes.lastTestResults.newValue);
+        if (area === 'local') {
+            if (changes.lastTestResults) {
+                showResults(changes.lastTestResults.newValue);
+            }
+            if (changes.pendingCheck && !changes.pendingCheck.newValue) {
+                // If pendingCheck is cleared but we don't have new results yet, 
+                // it might mean the timeout hit or results are being saved.
+                // We'll let the interval handle it.
+            }
         }
     });
 
 
-    function showLoading() {
+    let loadingInterval = null;
+    function showLoading(startTime) {
         placeholder.classList.add('hidden');
         resultsContainer.classList.add('hidden');
         loading.classList.remove('hidden');
         runBtn.disabled = true;
+
+        if (loadingInterval) clearInterval(loadingInterval);
+        
+        loadingInterval = setInterval(() => {
+            const now = Date.now();
+            const elapsed = Math.floor((now - (startTime || now)) / 1000);
+            
+            if (elapsed > 1.5) {
+                loadingText.textContent = "Scanning page...";
+                searchingStatus.textContent = `Searching for Kameleoon engine (${elapsed}s elapsed)...`;
+            } else {
+                loadingText.textContent = "Clearing data & reloading...";
+                searchingStatus.textContent = "";
+            }
+
+            // Safety check: if pendingCheck is gone, stop interval
+            chrome.storage.local.get(['pendingCheck'], (data) => {
+                if (!data.pendingCheck) {
+                    clearInterval(loadingInterval);
+                }
+            });
+        }, 1000);
     }
 
     function showPlaceholder() {
+        if (loadingInterval) clearInterval(loadingInterval);
         loading.classList.add('hidden');
         resultsContainer.classList.add('hidden');
         placeholder.classList.remove('hidden');
@@ -41,6 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showResults(data) {
+        if (loadingInterval) clearInterval(loadingInterval);
         loading.classList.add('hidden');
         placeholder.classList.add('hidden');
         resultsContainer.classList.remove('hidden');

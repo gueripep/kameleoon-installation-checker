@@ -19,6 +19,33 @@ let finalReport = {
     consentData: null
 };
 
+// Logic to run on page load
+let checkTimeout = null;
+chrome.storage.local.get(['pendingCheck', 'checkTimestamp'], (data) => {
+    if (data.pendingCheck && data.pendingCheck === window.location.origin) {
+        // Inject script to extract data from window.Kameleoon
+        // We inject it immediately and let it poll
+        injectScript(chrome.runtime.getURL('inject.js'), 'body');
+
+        // Set a timeout to finalize if not found after 60 seconds
+        checkTimeout = setTimeout(() => {
+            if (chrome.runtime.id) { // Check if extension still valid
+                chrome.storage.local.get(['lastTestResults'], (res) => {
+                    // If we haven't received API data yet, finalize as failure
+                    if (res.lastTestResults && (!res.lastTestResults.apiData || res.lastTestResults.apiData.length === 0)) {
+                        finalReport.timestamp = Date.now();
+                        finalReport.domData = runDomTests();
+                        finalReport.performanceData = runPerformanceTests();
+                        saveReport();
+                        
+                        chrome.storage.local.remove(['pendingCheck', 'checkTimestamp']);
+                    }
+                });
+            }
+        }, 60000); 
+    }
+});
+
 // Setup a listener for messages from the injected script
 window.addEventListener('message', async function(event) {
     // We only accept messages from ourselves
@@ -30,6 +57,9 @@ window.addEventListener('message', async function(event) {
         finalReport.consentData = event.data.payload;
         saveReport();
     } else if (event.data.type === 'KAMELEOON_API_DATA') {
+        // Clear timeout as we found it!
+        if (checkTimeout) clearTimeout(checkTimeout);
+
         finalReport.apiData = event.data.payload;
         finalReport.domData = runDomTests();
         finalReport.performanceData = runPerformanceTests();
@@ -37,12 +67,8 @@ window.addEventListener('message', async function(event) {
         finalReport.timestamp = Date.now();
         saveReport();
         
-        // Clear pending check if exists
-        chrome.storage.local.get(['pendingCheck'], (data) => {
-            if (data.pendingCheck && data.pendingCheck === window.location.origin) {
-                chrome.storage.local.remove(['pendingCheck', 'checkTimestamp']);
-            }
-        });
+        // Clear pending check
+        chrome.storage.local.remove(['pendingCheck', 'checkTimestamp']);
     }
 });
 
@@ -357,14 +383,3 @@ function runPerformanceTests() {
         startTime: Math.round(resourceTiming.startTime || 0)
     };
 }
-
-// Logic to run on page load
-chrome.storage.local.get(['pendingCheck'], (data) => {
-    if (data.pendingCheck && data.pendingCheck === window.location.origin) {
-        // Delay slightly for SPAs to render DOM and load scripts if not SSR
-        setTimeout(() => {
-            // Inject script to extract data from window.Kameleoon
-            injectScript(chrome.runtime.getURL('inject.js'), 'body');
-        }, 1500);
-    }
-});
