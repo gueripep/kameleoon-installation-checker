@@ -8,9 +8,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchingStatus = document.getElementById('searchingStatus');
     const loadingText = document.getElementById('loadingText');
 
+    let currentTabId = null;
+
     function checkState() {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
             const currentTab = tabs[0];
+            if (!currentTab) return;
+            
+            currentTabId = currentTab.id;
             let currentOrigin = null;
             if (currentTab?.url) {
                 try {
@@ -18,21 +23,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 } catch (e) {}
             }
 
-            chrome.storage.local.get(['pendingCheck', 'checkTimestamp', 'lastTestResults'], (data) => {
-                const now = Date.now();
-                // Consider a check stale if it's older than 2 minutes
-                const isStale = data.checkTimestamp && (now - data.checkTimestamp) > 120000;
+            const pendingKey = `pending_${currentTabId}`;
+            const timestampKey = `timestamp_${currentTabId}`;
+            const resultsKey = `results_${currentTabId}`;
 
-                if (data.pendingCheck && !isStale && data.pendingCheck === currentOrigin) {
-                    showLoading(data.checkTimestamp);
+            chrome.storage.local.get([pendingKey, timestampKey, resultsKey], (data) => {
+                const now = Date.now();
+                const pendingCheck = data[pendingKey];
+                const checkTimestamp = data[timestampKey];
+                const lastTestResults = data[resultsKey];
+
+                // Consider a check stale if it's older than 2 minutes
+                const isStale = checkTimestamp && (now - checkTimestamp) > 120000;
+
+                if (pendingCheck && !isStale && pendingCheck === currentOrigin) {
+                    showLoading(checkTimestamp);
                 } else {
                     // If we were showing a pending check but it's stale or mismatched, clear it
-                    if (data.pendingCheck && (isStale || data.pendingCheck !== currentOrigin)) {
-                        chrome.storage.local.remove(['pendingCheck', 'checkTimestamp']);
+                    if (pendingCheck && (isStale || pendingCheck !== currentOrigin)) {
+                        chrome.storage.local.remove([pendingKey, timestampKey]);
                     }
                     
-                    if (data.lastTestResults) {
-                        showResults(data.lastTestResults);
+                    if (lastTestResults) {
+                        showResults(lastTestResults);
                     } else {
                         showPlaceholder();
                     }
@@ -43,14 +56,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Listen for storage changes to update UI in real-time
     chrome.storage.onChanged.addListener((changes, area) => {
-        if (area === 'local') {
-            if (changes.lastTestResults) {
-                showResults(changes.lastTestResults.newValue);
+        if (area === 'local' && currentTabId) {
+            const resultsKey = `results_${currentTabId}`;
+            const pendingKey = `pending_${currentTabId}`;
+
+            if (changes[resultsKey]) {
+                showResults(changes[resultsKey].newValue);
             }
-            if (changes.pendingCheck && !changes.pendingCheck.newValue) {
-                // If pendingCheck is cleared but we don't have new results yet, 
-                // it might mean the timeout hit or results are being saved.
-                // We'll let the interval handle it.
+            if (changes[pendingKey] && !changes[pendingKey].newValue && !resultsContainer.classList.contains('hidden')) {
+                // Pending finished
             }
         }
     });
@@ -79,11 +93,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Safety check: if pendingCheck is gone, stop interval
-            chrome.storage.local.get(['pendingCheck'], (data) => {
-                if (!data.pendingCheck) {
-                    clearInterval(loadingInterval);
-                }
-            });
+            if (currentTabId) {
+                const pendingKey = `pending_${currentTabId}`;
+                chrome.storage.local.get([pendingKey], (data) => {
+                    if (!data[pendingKey]) {
+                        clearInterval(loadingInterval);
+                    }
+                });
+            }
         }, 1000);
     }
 
@@ -215,9 +232,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 cookieCountDebug = 'Waiting for cookies to stabilize...';
                 // Trigger a re-render once the delay has passed
                 setTimeout(() => {
-                    chrome.storage.local.get(['lastTestResults'], (res) => {
-                        if (res.lastTestResults) showResults(res.lastTestResults);
-                    });
+                    if (currentTabId) {
+                        const resultsKey = `results_${currentTabId}`;
+                        chrome.storage.local.get([resultsKey], (res) => {
+                            if (res[resultsKey]) showResults(res[resultsKey]);
+                        });
+                    }
                 }, 2000 - timeSinceConsent + 100);
             } else {
                 const cookieCount = data.consentData.cookieData?.count || 0;
@@ -363,10 +383,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Check state every second while loading to auto-update when results hit storage
     setInterval(() => {
-        if (!loading.classList.contains('hidden')) {
-            chrome.storage.local.get(['pendingCheck', 'lastTestResults'], (data) => {
-                if (!data.pendingCheck && data.lastTestResults) {
-                    showResults(data.lastTestResults);
+        if (!loading.classList.contains('hidden') && currentTabId) {
+            const pendingKey = `pending_${currentTabId}`;
+            const resultsKey = `results_${currentTabId}`;
+            chrome.storage.local.get([pendingKey, resultsKey], (data) => {
+                if (!data[pendingKey] && data[resultsKey]) {
+                    showResults(data[resultsKey]);
                 }
             });
         }

@@ -22,8 +22,8 @@ let finalReport = {
 
 // Logic to run on page load
 let checkTimeout = null;
-chrome.storage.local.get(['pendingCheck', 'checkTimestamp'], (data) => {
-    if (data.pendingCheck && data.pendingCheck === window.location.origin) {
+chrome.runtime.sendMessage({ action: 'get_tab_status' }, (response) => {
+    if (response && response.pending && response.pending === window.location.origin) {
         // Inject script to extract data from window.Kameleoon
         // We inject it immediately and let it poll
         injectScript(chrome.runtime.getURL('inject.js'), 'body');
@@ -31,25 +31,14 @@ chrome.storage.local.get(['pendingCheck', 'checkTimestamp'], (data) => {
         // Set a timeout to finalize if not found after 60 seconds
         checkTimeout = setTimeout(() => {
             if (chrome.runtime.id) { // Check if extension still valid
-                chrome.storage.local.get(['lastTestResults'], (res) => {
-                    // If we haven't received API data yet, finalize as failure
-                    if (!res.lastTestResults || !res.lastTestResults.apiData || res.lastTestResults.apiData.length === 0) {
-                        finalReport.timestamp = Date.now();
-                        finalReport.domData = runDomTests();
-                        finalReport.performanceData = runPerformanceTests();
-                        saveReport();
-                        
-                        chrome.storage.local.remove(['pendingCheck', 'checkTimestamp']);
-                    } else if (res.lastTestResults.timestamp < data.checkTimestamp) {
-                        // Results are older than our current check, so we haven't found anything new
-                        finalReport.timestamp = Date.now();
-                        finalReport.domData = runDomTests();
-                        finalReport.performanceData = runPerformanceTests();
-                        saveReport();
-                        
-                        chrome.storage.local.remove(['pendingCheck', 'checkTimestamp']);
-                    }
-                });
+                // Ask background for latest status/results if needed, 
+                // but here we just want to finalize our local finalReport if nothing happened
+                if (!finalReport.apiData || finalReport.apiData.length === 0) {
+                    finalReport.timestamp = Date.now();
+                    finalReport.domData = runDomTests();
+                    finalReport.performanceData = runPerformanceTests();
+                    saveReport();
+                }
             }
         }, 60000); 
     }
@@ -86,7 +75,7 @@ window.addEventListener('message', async function(event) {
 });
 
 function saveReport() {
-    chrome.storage.local.set({ lastTestResults: finalReport });
+    chrome.runtime.sendMessage({ action: 'save_results', results: finalReport });
 }
 
 async function checkItp() {

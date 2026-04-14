@@ -8,6 +8,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       
       const tab = tabs[0];
+      const tabId = tab.id;
       const url = new URL(tab.url);
       
       // We can't clear browsing data for chrome:// or file:// URLs
@@ -23,16 +24,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const itpWorkarounds = data.itpWorkarounds || {};
         delete itpWorkarounds[origin]; // Reset for this origin
         
-        chrome.storage.local.set({ 
-          pendingCheck: origin, 
-          checkTimestamp: Date.now(),
+        const storageUpdate = {
           itpWorkarounds 
-        }, () => {
-          // 3. Clear browsing data for this origin
-          clearSiteData(origin, () => {
-            // 4. Reload the tab
-            chrome.tabs.reload(tab.id, { bypassCache: true }, () => {
-              sendResponse({ success: true });
+        };
+        storageUpdate[`pending_${tabId}`] = origin;
+        storageUpdate[`timestamp_${tabId}`] = Date.now();
+        
+        // Clear previous results for this tab
+        chrome.storage.local.remove(`results_${tabId}`, () => {
+          chrome.storage.local.set(storageUpdate, () => {
+            // 3. Clear browsing data for this origin
+            clearSiteData(origin, () => {
+              // 4. Reload the tab
+              chrome.tabs.reload(tabId, { bypassCache: true }, () => {
+                sendResponse({ success: true });
+              });
             });
           });
         });
@@ -42,6 +48,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Return true to indicate we will send response asynchronously
     return true; 
   }
+
+  if (message.action === 'save_results') {
+    const tabId = sender.tab.id;
+    const results = message.results;
+    const storageUpdate = {};
+    storageUpdate[`results_${tabId}`] = results;
+    
+    // When saving results, we also clear the pending status for this tab
+    chrome.storage.local.remove([`pending_${tabId}`, `timestamp_${tabId}`], () => {
+        chrome.storage.local.set(storageUpdate);
+    });
+  }
+
+  if (message.action === 'get_tab_status') {
+      const tabId = sender.tab.id;
+      chrome.storage.local.get([`pending_${tabId}`, `timestamp_${tabId}`], (data) => {
+          sendResponse({
+              pending: data[`pending_${tabId}`],
+              timestamp: data[`timestamp_${tabId}`]
+          });
+      });
+      return true;
+  }
+});
+
+// Clean up tab-specific data when tab is closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+    chrome.storage.local.remove([
+        `results_${tabId}`,
+        `pending_${tabId}`,
+        `timestamp_${tabId}`
+    ]);
 });
 
 function clearSiteData(origin, callback) {

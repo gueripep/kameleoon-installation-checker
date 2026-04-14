@@ -5,6 +5,7 @@
   "description": "Check and validate Kameleoon snippet installation on websites.",
   "permissions": [
     "activeTab",
+    "tabs",
     "storage",
     "browsingData",
     "scripting",
