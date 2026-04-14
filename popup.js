@@ -9,14 +9,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadingText = document.getElementById('loadingText');
 
     function checkState() {
-        chrome.storage.local.get(['pendingCheck', 'checkTimestamp', 'lastTestResults'], (data) => {
-            if (data.pendingCheck) {
-                showLoading(data.checkTimestamp);
-            } else if (data.lastTestResults) {
-                showResults(data.lastTestResults);
-            } else {
-                showPlaceholder();
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            const currentTab = tabs[0];
+            let currentOrigin = null;
+            if (currentTab?.url) {
+                try {
+                    currentOrigin = new URL(currentTab.url).origin;
+                } catch (e) {}
             }
+
+            chrome.storage.local.get(['pendingCheck', 'checkTimestamp', 'lastTestResults'], (data) => {
+                const now = Date.now();
+                // Consider a check stale if it's older than 2 minutes
+                const isStale = data.checkTimestamp && (now - data.checkTimestamp) > 120000;
+
+                if (data.pendingCheck && !isStale && data.pendingCheck === currentOrigin) {
+                    showLoading(data.checkTimestamp);
+                } else {
+                    // If we were showing a pending check but it's stale or mismatched, clear it
+                    if (data.pendingCheck && (isStale || data.pendingCheck !== currentOrigin)) {
+                        chrome.storage.local.remove(['pendingCheck', 'checkTimestamp']);
+                    }
+                    
+                    if (data.lastTestResults) {
+                        showResults(data.lastTestResults);
+                    } else {
+                        showPlaceholder();
+                    }
+                }
+            });
         });
     }
 
@@ -46,7 +67,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         loadingInterval = setInterval(() => {
             const now = Date.now();
-            const elapsed = Math.floor((now - (startTime || now)) / 1000);
+            const start = startTime || now;
+            const elapsed = Math.floor((now - start) / 1000);
 
             if (elapsed > 1.5) {
                 loadingText.textContent = "Scanning page...";

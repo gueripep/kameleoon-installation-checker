@@ -33,7 +33,15 @@ chrome.storage.local.get(['pendingCheck', 'checkTimestamp'], (data) => {
             if (chrome.runtime.id) { // Check if extension still valid
                 chrome.storage.local.get(['lastTestResults'], (res) => {
                     // If we haven't received API data yet, finalize as failure
-                    if (res.lastTestResults && (!res.lastTestResults.apiData || res.lastTestResults.apiData.length === 0)) {
+                    if (!res.lastTestResults || !res.lastTestResults.apiData || res.lastTestResults.apiData.length === 0) {
+                        finalReport.timestamp = Date.now();
+                        finalReport.domData = runDomTests();
+                        finalReport.performanceData = runPerformanceTests();
+                        saveReport();
+                        
+                        chrome.storage.local.remove(['pendingCheck', 'checkTimestamp']);
+                    } else if (res.lastTestResults.timestamp < data.checkTimestamp) {
+                        // Results are older than our current check, so we haven't found anything new
                         finalReport.timestamp = Date.now();
                         finalReport.domData = runDomTests();
                         finalReport.performanceData = runPerformanceTests();
@@ -180,7 +188,10 @@ function runDomTests() {
         );
 
         if (antiFlickerSnippets.length !== 0) {
-            const timeoutMatch = antiFlickerSnippets[0]?.textContent.match(/kameleoonLoadingTimeout\s*=\s*(\d+)/);
+            const timeoutMatch = antiFlickerSnippets[0]?.textContent.match(/kameleoonLoadingTimeout\s*=\s*([\d.eE+-]+)/);
+            const rawTimeout = timeoutMatch ? timeoutMatch[1] : null;
+            const parsedTimeout = rawTimeout ? Number(rawTimeout) : NaN;
+
             tests.push(
                 {
                     id: 'antiflicker-unique',
@@ -190,9 +201,10 @@ function runDomTests() {
                 },
                 {
                     id: 'antiflicker-timeout',
-                    test: timeoutMatch && parseInt(timeoutMatch[1]) === 1000,
-                    pass: `Anti-flicker timeout is set to 1000ms`,
-                    fail: `Anti-flicker timeout is not set to 1000ms`
+                    test: !isNaN(parsedTimeout) && parsedTimeout <= 1000,
+                    pass: `Anti-flicker timeout is under or equal to 1000ms`,
+                    fail: isNaN(parsedTimeout) ? `Anti-flicker timeout value could not be parsed` : `Anti-flicker timeout is too high (> 1000ms)`,
+                    debug: rawTimeout ? `Detected value: ${rawTimeout}${rawTimeout !== String(parsedTimeout) && !isNaN(parsedTimeout) ? ` (${parsedTimeout}ms)` : 'ms'}` : ''
                 },
                 {
                     id: 'antiflicker-order',

@@ -5,19 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kameleoon Checker</title>
     <link rel="stylesheet" href="popup.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container">
         <header>
             <div class="logo">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="24" height="24" rx="6" fill="#1d342f"/>
+                    <path d="M7 8.5L12 6L17 8.5M7 8.5L12 11M7 8.5V15.5L12 18M17 8.5L12 11M17 8.5V15.5L12 18M12 11V18" stroke="#e5f5b5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
                 <h1>Kameleoon Checker</h1>
             </div>
             <button id="runCheckBtn" class="primary-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-9.21l5.64-4.21"/>
                 </svg>
                 Run Clean Check
@@ -26,7 +27,7 @@
 
         <main id="resultsContainer">
             <div class="placeholder active" id="placeholder">
-                <p>Click "Run Clean Check" to clear site data and test this page.</p>
+                <p>Click <strong>"Run Clean Check"</strong> to clear site data and test this page.</p>
             </div>
             
             <div id="loading" class="loading hidden">
