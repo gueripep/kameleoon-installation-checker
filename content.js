@@ -20,19 +20,25 @@ let finalReport = {
     itpData: null
 };
 
+let currentTabId = null;
+
 // Logic to run on page load
 let checkTimeout = null;
 chrome.runtime.sendMessage({ action: 'get_tab_status' }, (response) => {
     if (response && response.pending && response.pending === window.location.origin) {
+        currentTabId = response.tabId;
+        
+        // Use ITP data from the response if available
+        if (response.itpData) {
+            updateItpData(response.itpData);
+        }
+
         // Inject script to extract data from window.Kameleoon
-        // We inject it immediately and let it poll
         injectScript(chrome.runtime.getURL('inject.js'), 'body');
 
         // Set a timeout to finalize if not found after 60 seconds
         checkTimeout = setTimeout(() => {
-            if (chrome.runtime.id) { // Check if extension still valid
-                // Ask background for latest status/results if needed, 
-                // but here we just want to finalize our local finalReport if nothing happened
+            if (chrome.runtime.id) {
                 if (!finalReport.apiData || finalReport.apiData.length === 0) {
                     finalReport.timestamp = Date.now();
                     finalReport.domData = runDomTests();
@@ -46,17 +52,15 @@ chrome.runtime.sendMessage({ action: 'get_tab_status' }, (response) => {
 
 // Setup a listener for messages from the injected script
 window.addEventListener('message', async function(event) {
-    // We only accept messages from ourselves
     if (event.source !== window || !event.data) {
         return;
     }
 
     if (event.data.type === 'KAMELEOON_CONSENT_DATA') {
         finalReport.consentData = event.data.payload;
-        checkItp();
+        await checkItp(); // Refresh ITP status with latest consent info
         saveReport();
     } else if (event.data.type === 'KAMELEOON_API_DATA') {
-        // Clear timeout as we found it!
         if (checkTimeout) clearTimeout(checkTimeout);
 
         finalReport.apiData = event.data.payload;
@@ -68,9 +72,6 @@ window.addEventListener('message', async function(event) {
 
         finalReport.timestamp = Date.now();
         saveReport();
-        
-        // Clear pending check
-        chrome.storage.local.remove(['pendingCheck', 'checkTimestamp']);
     }
 });
 
@@ -79,25 +80,32 @@ function saveReport() {
 }
 
 async function checkItp() {
-    const storageData = await new Promise(resolve => chrome.storage.local.get(['itpWorkarounds'], resolve));
-    const origin = window.location.origin;
-    if (storageData.itpWorkarounds && storageData.itpWorkarounds[origin]) {
-        const itpData = storageData.itpWorkarounds[origin];
-        const wasTrueOnLoad = finalReport.consentData ? (finalReport.consentData.wasTrueOnLoad.experiment || finalReport.consentData.wasTrueOnLoad.personalization || finalReport.consentData.wasTrueOnLoad.recommendation) : false;
-        
-        const tooEarly = itpData.detections.some(d => d.type === 'main_frame' && !wasTrueOnLoad);
-        
-        finalReport.itpData = {
-            ...itpData,
-            status: tooEarly ? 'privacy_risk' : 'compliant'
-        };
+    if (!currentTabId) return;
+    const itpKey = `itpWorkaround_${currentTabId}`;
+    const storageData = await new Promise(resolve => chrome.storage.local.get([itpKey], resolve));
+    const detections = storageData[itpKey];
+    
+    if (detections) {
+        updateItpData(detections);
     }
 }
 
-// Monitor storage for new ITP detections from background script
+function updateItpData(detections) {
+    const wasTrueOnLoad = finalReport.consentData ? (finalReport.consentData.wasTrueOnLoad.experiment || finalReport.consentData.wasTrueOnLoad.personalization || finalReport.consentData.wasTrueOnLoad.recommendation) : false;
+    
+    const tooEarly = detections.some(d => d.type === 'main_frame' && !wasTrueOnLoad);
+    
+    finalReport.itpData = {
+        detections: detections,
+        status: tooEarly ? 'privacy_risk' : 'compliant'
+    };
+}
+
+// Monitor storage for new ITP detections for this specific tab
 chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes.itpWorkarounds) {
-        checkItp().then(() => saveReport());
+    if (area === 'local' && currentTabId && changes[`itpWorkaround_${currentTabId}`]) {
+        updateItpData(changes[`itpWorkaround_${currentTabId}`].newValue);
+        saveReport();
     }
 });
 

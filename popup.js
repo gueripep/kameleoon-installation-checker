@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const resultsKey = `results_${currentTabId}`;
             const pendingKey = `pending_${currentTabId}`;
 
-            if (changes[resultsKey]) {
+            if (changes[resultsKey] && changes[resultsKey].newValue) {
                 showResults(changes[resultsKey].newValue);
             }
             if (changes[pendingKey] && !changes[pendingKey].newValue && !resultsContainer.classList.contains('hidden')) {
@@ -113,6 +113,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showResults(data) {
+        if (!data) return;
+
         if (loadingInterval) clearInterval(loadingInterval);
         loading.classList.add('hidden');
         placeholder.classList.add('hidden');
