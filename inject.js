@@ -1,7 +1,20 @@
 // This script is injected into the main world to access `window.Kameleoon`
 (function() {
     const results = [];
-    
+
+    // Bundled/hydration-sensitive implementations (e.g. Next.js) declare
+    // `kameleoonLoadingTimeout` inside a compiled JS chunk rather than an inline
+    // <script> tag, so it can't be found by scanning the DOM's script text.
+    // These globals are set by the anti-flicker snippet regardless of where it
+    // lives, and are left in place even after the timeout fires, so they act as
+    // a runtime fallback signal that anti-flicker ran.
+    const antiFlickerRuntime = {
+        hasStartLoadTime: typeof window.kameleoonStartLoadTime !== 'undefined',
+        hasQueue: Array.isArray(window.kameleoonQueue),
+        hasDisplayPageFn: typeof window.kameleoonDisplayPage !== 'undefined',
+        hasTimeoutHandle: typeof window.kameleoonDisplayPageTimeOut !== 'undefined'
+    };
+
     function checkKameleoonApi() {
         if (!window.Kameleoon?.API?.Visitor?.code || !window.Kameleoon?.Internals?.configuration) {
             return false;
@@ -41,7 +54,8 @@
         if (apiResults) {
             window.postMessage({
                 type: 'KAMELEOON_API_DATA',
-                payload: apiResults
+                payload: apiResults,
+                antiFlickerRuntime
             }, '*');
             apiDataSent = true;
         }

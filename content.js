@@ -64,7 +64,7 @@ window.addEventListener('message', async function(event) {
         if (checkTimeout) clearTimeout(checkTimeout);
 
         finalReport.apiData = event.data.payload;
-        finalReport.domData = runDomTests();
+        finalReport.domData = runDomTests(event.data.antiFlickerRuntime);
         finalReport.performanceData = runPerformanceTests();
         finalReport.cspData = await runCspTests();
         
@@ -110,13 +110,28 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 
-function runDomTests() {
+function runDomTests(antiFlickerRuntime) {
     const kameleoonSnippet = document.querySelector('script[src*="engine.js"]') || document.querySelector('script[src*="kameleoon.js"]');
+    const isExecutableScript = tag => {
+        const type = tag.type ? tag.type.toLowerCase() : '';
+        return !type || type === 'text/javascript' || type === 'module' || type === 'application/javascript';
+    };
+
+    const containsRealIdentifier = (code, identifier) => {
+        try {
+            // Remove JS comments and string literals to avoid matching stringified payload data
+            const cleanCode = code.replace(/\/\/.*|\/\*[\s\S]*?\*\/|(["'`])(?:(?!\1)[^\\]|\\[\s\S])*\1/g, '');
+            return cleanCode.includes(identifier);
+        } catch (e) {
+            return code.includes(identifier); // Fallback
+        }
+    };
+
     const antiFlickerSnippets = [...document.querySelectorAll('script:not([src])')].filter(tag =>
-        tag.textContent.includes('kameleoonLoadingTimeout')
+        isExecutableScript(tag) && containsRealIdentifier(tag.textContent, 'kameleoonLoadingTimeout')
     );
     const iframeSnippet = [...document.querySelectorAll('script:not([src])')].find(tag =>
-        tag.textContent.includes('kameleoonIframeURL')
+        isExecutableScript(tag) && containsRealIdentifier(tag.textContent, 'kameleoonIframeURL')
     );
 
     const allScripts = [...document.querySelectorAll('script')].map(s => ({
@@ -130,6 +145,13 @@ function runDomTests() {
     const hasLegacyEngine = kameleoonScripts.some(s => s.src && s.src.includes('kameleoon.js'));
 
     const scriptsFound = document.querySelectorAll('script[src*="engine.js"], script[src*="kameleoon.js"]').length;
+
+    const antiFlickerRuntimeDetected = !!antiFlickerRuntime && (
+        antiFlickerRuntime.hasStartLoadTime ||
+        antiFlickerRuntime.hasQueue ||
+        antiFlickerRuntime.hasDisplayPageFn ||
+        antiFlickerRuntime.hasTimeoutHandle
+    );
 
     const tests = [
         {
@@ -177,10 +199,12 @@ function runDomTests() {
             },
             {
                 id: 'antiflicker-presence',
-                test: antiFlickerSnippets.length !== 0,
-                pass: `Anti-flicker snippet is present on page`,
+                test: antiFlickerSnippets.length !== 0 || antiFlickerRuntimeDetected,
+                pass: antiFlickerSnippets.length !== 0
+                    ? `Anti-flicker snippet is present on page`
+                    : `Anti-flicker mechanism detected at runtime (kameleoonQueue/kameleoonDisplayPage globals found), but not as an inline script — likely a bundled/hydration-sensitive implementation (e.g. Next.js) where kameleoonLoadingTimeout lives in a compiled JS chunk rather than inline HTML`,
                 fail: `Anti-flicker snippet is not present on page`,
-                warning: false
+                warning: antiFlickerSnippets.length === 0 && antiFlickerRuntimeDetected
             }
         );
 
@@ -214,21 +238,21 @@ function runDomTests() {
         }
 
         if (iframeSnippet !== undefined) {
-            tests.push(
-                {
+            if (antiFlickerSnippets.length !== 0) {
+                tests.push({
                     id: 'iframe-order-1',
                     test: antiFlickerSnippets[0]?.compareDocumentPosition(iframeSnippet) === 4,
                     pass: `Iframe snippet appears after Anti-flicker snippet`,
                     fail: `Iframe snippet does not appear after Anti-flicker snippet`
-                },
-                {
-                    id: 'iframe-order-2',
-                    test: iframeSnippet?.compareDocumentPosition(kameleoonSnippet) === 4,
-                    pass: `Iframe snippet appears before ${scriptName}`,
-                    fail: `Iframe snippet does not appear before ${scriptName}`,
-                    warning: false
-                }
-            );
+                });
+            }
+            tests.push({
+                id: 'iframe-order-2',
+                test: iframeSnippet?.compareDocumentPosition(kameleoonSnippet) === 4,
+                pass: `Iframe snippet appears before ${scriptName}`,
+                fail: `Iframe snippet does not appear before ${scriptName}`,
+                warning: false
+            });
         }
     }
 

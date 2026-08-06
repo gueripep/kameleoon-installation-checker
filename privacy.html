@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — Kameleoon Installation Checker (Unofficial)</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    max-width: 720px;
+    margin: 40px auto;
+    padding: 0 20px;
+    line-height: 1.6;
+    color: #222;
+  }
+  h1 { font-size: 1.6em; margin-bottom: 0.2em; }
+  .updated { color: #666; font-size: 0.9em; margin-bottom: 2em; }
+  h2 { font-size: 1.15em; margin-top: 2em; }
+  code {
+    background: #f2f2f2;
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  ul { padding-left: 1.2em; }
+  li { margin-bottom: 0.4em; }
+  a { color: #0645ad; }
+</style>
+</head>
+<body>
+
+<h1>Privacy Policy — Kameleoon Installation Checker (Unofficial)</h1>
+<p class="updated">Last updated: 2026-07-22</p>
+
+<p>Kameleoon Installation Checker (Unofficial) is a Chrome extension that checks whether the Kameleoon snippet is correctly installed and configured on the current webpage (script loading, anti-flicker snippet, CSP headers, execution permissions, load performance).</p>
+
+<h2>What the extension does</h2>
+<ul>
+  <li>Reads the DOM, response headers, and network activity of the page you are currently viewing, to detect Kameleoon-related scripts, domains, and configuration.</li>
+  <li>Stores check results locally in your browser (<code>chrome.storage.local</code>), scoped per tab, so results persist across a page reload triggered by the extension.</li>
+</ul>
+
+<h2>What the extension does not do</h2>
+<ul>
+  <li>It does not collect, transmit, or sell any personal data, browsing history, or page content to Kameleoon, the developer, or any third party.</li>
+  <li>It does not use analytics, tracking, or advertising services.</li>
+  <li>All processing happens locally in your browser. No data ever leaves your device.</li>
+</ul>
+
+<h2>Permissions</h2>
+<ul>
+  <li><code>activeTab</code> / <code>tabs</code>: to run checks on the page you're currently viewing and manage per-tab state.</li>
+  <li><code>scripting</code>: to inject the diagnostic script that inspects the page.</li>
+  <li><code>webRequest</code>: to inspect response headers (e.g. Content-Security-Policy) relevant to the Kameleoon snippet.</li>
+  <li><code>storage</code>: to save check results locally between the check and the popup displaying them.</li>
+  <li><code>browsingData</code>: used only to clear cached data for the current site when re-running a check, so results reflect a clean reload.</li>
+  <li>Host permissions (<code>&lt;all_urls&gt;</code>): required because the extension must be able to run its check on any site the user chooses to test.</li>
+</ul>
+
+<h2>Contact</h2>
+<p>Questions about this policy can be sent to <a href="mailto:pgueripel@kameleoon.com">pgueripel@kameleoon.com</a>.</p>
+
+</body>
+</html>
