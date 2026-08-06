@@ -269,7 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // 4. DOM Tests
         if (data.domData && data.domData.length > 0) {
             sectionsContainer.appendChild(createSection('DOM Implementation', data.domData,
-                item => item.pass ? item.pass : item.fail,
+                item => item.test ? item.pass : item.fail,
                 item => item.test ? 'pass' : (item.warning ? 'warning' : 'fail'),
                 item => item.debug || ''
             ));

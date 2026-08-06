@@ -200,11 +200,12 @@ function runDomTests(antiFlickerRuntime) {
             {
                 id: 'antiflicker-presence',
                 test: antiFlickerSnippets.length !== 0 || antiFlickerRuntimeDetected,
-                pass: antiFlickerSnippets.length !== 0
-                    ? `Anti-flicker snippet is present on page`
-                    : `Anti-flicker mechanism detected at runtime (kameleoonQueue/kameleoonDisplayPage globals found), but not as an inline script — likely a bundled/hydration-sensitive implementation (e.g. Next.js) where kameleoonLoadingTimeout lives in a compiled JS chunk rather than inline HTML`,
+                pass: `Anti-flicker snippet is present on page`,
                 fail: `Anti-flicker snippet is not present on page`,
-                warning: antiFlickerSnippets.length === 0 && antiFlickerRuntimeDetected
+                debug: antiFlickerSnippets.length === 0 && antiFlickerRuntimeDetected
+                    ? `Detected via hydration method (kameleoonQueue/kameleoonDisplayPage globals) — likely a bundled implementation like Next.js`
+                    : '',
+                warning: false
             }
         );
 
