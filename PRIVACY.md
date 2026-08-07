@@ -1,8 +1,8 @@
-# Privacy Policy — Kameleoon Installation Checker (Unofficial)
+# Privacy Policy — A/B check for Kameleoon (Unofficial)
 
-Last updated: 2026-07-22
+Last updated: 2026-08-07
 
-Kameleoon Installation Checker (Unofficial) is a Chrome extension that checks whether the Kameleoon snippet is correctly installed and configured on the current webpage (script loading, anti-flicker snippet, CSP headers, execution permissions, load performance).
+A/B check for Kameleoon (Unofficial) is a Chrome extension that checks whether the Kameleoon snippet is correctly installed and configured on the current webpage (script loading, anti-flicker snippet, CSP headers, execution permissions, load performance).
 
 ## What the extension does
 

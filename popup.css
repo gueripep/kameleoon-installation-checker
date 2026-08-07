@@ -362,6 +362,11 @@ main {
     color: var(--warning);
 }
 
+.test-icon.neutral {
+    background-color: var(--neutral-lightest);
+    color: var(--neutral-mid);
+}
+
 /* Colored left border accent per status */
 .test-item:has(.test-icon.pass) {
     border-left-color: var(--success);
@@ -373,6 +378,10 @@ main {
 
 .test-item:has(.test-icon.warning) {
     border-left-color: var(--warning);
+}
+
+.test-item:has(.test-icon.neutral) {
+    border-left-color: var(--neutral-lighter);
 }
 
 /* --- Test Content --- */
@@ -394,6 +403,19 @@ main {
     color: var(--text-secondary);
     word-break: break-word;
     line-height: 1.5;
+}
+
+.test-doclink {
+    display: inline-block;
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--kam-blue-link);
+    text-decoration: none;
+}
+
+.test-doclink:hover {
+    text-decoration: underline;
 }
 
 /* ===== CSP Missing List ===== */

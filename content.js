@@ -36,17 +36,20 @@ chrome.runtime.sendMessage({ action: 'get_tab_status' }, (response) => {
         // Inject script to extract data from window.Kameleoon
         injectScript(chrome.runtime.getURL('inject.js'), 'body');
 
-        // Set a timeout to finalize if not found after 60 seconds
+        // Finalize with a "not detected" report if Kameleoon hasn't shown up yet.
+        // This doesn't preclude a correct report later: the KAMELEOON_API_DATA
+        // listener below keeps running and will overwrite this with full data
+        // the moment Kameleoon actually loads, however late that happens.
         checkTimeout = setTimeout(() => {
             if (chrome.runtime.id) {
                 if (!finalReport.apiData || finalReport.apiData.length === 0) {
                     finalReport.timestamp = Date.now();
                     finalReport.domData = runDomTests();
                     finalReport.performanceData = runPerformanceTests();
-                    saveReport();
+                    saveReport(false);
                 }
             }
-        }, 60000); 
+        }, 8000);
     }
 });
 
@@ -59,7 +62,7 @@ window.addEventListener('message', async function(event) {
     if (event.data.type === 'KAMELEOON_CONSENT_DATA') {
         finalReport.consentData = event.data.payload;
         await checkItp(); // Refresh ITP status with latest consent info
-        saveReport();
+        saveReport(false);
     } else if (event.data.type === 'KAMELEOON_API_DATA') {
         if (checkTimeout) clearTimeout(checkTimeout);
 
@@ -67,16 +70,21 @@ window.addEventListener('message', async function(event) {
         finalReport.domData = runDomTests(event.data.antiFlickerRuntime);
         finalReport.performanceData = runPerformanceTests();
         finalReport.cspData = await runCspTests();
-        
+
         await checkItp();
 
         finalReport.timestamp = Date.now();
-        saveReport();
+        saveReport(true);
     }
 });
 
-function saveReport() {
-    chrome.runtime.sendMessage({ action: 'save_results', results: finalReport });
+// isFinal marks a genuine Kameleoon detection. Interim/fallback saves (e.g. a
+// "not found yet" report, or consent-only data on a page where Kameleoon
+// never loaded — like a Shopify password-gate page) must NOT clear the
+// pending flag, otherwise a later same-origin navigation (e.g. after
+// submitting the store password) won't get re-checked at all.
+function saveReport(isFinal = false) {
+    chrome.runtime.sendMessage({ action: 'save_results', results: finalReport, isFinal });
 }
 
 async function checkItp() {
@@ -160,7 +168,8 @@ function runDomTests(antiFlickerRuntime) {
             pass: hasModernEngine ? `Modern engine.js is present on page` : `Legacy kameleoon.js is present (Update Recommended)`,
             fail: `Neither engine.js nor kameleoon.js is present on page`,
             debug: kameleoonScripts.length > 0 ? `Found ${kameleoonScripts.length} Kameleoon-related scripts` : 'No Kameleoon scripts found in DOM',
-            warning: !hasModernEngine && hasLegacyEngine
+            warning: !hasModernEngine && hasLegacyEngine,
+            docs: 'https://docs.kameleoon.com/developer-docs/web-experimentation/implementation-and-deployment/standard-implementation'
         },
         {
             id: 'engine-unique',
@@ -181,21 +190,16 @@ function runDomTests(antiFlickerRuntime) {
                 test: document.head.querySelector(`script[src*="${scriptName}"]`) !== null,
                 pass: `${scriptName} is present in the <head> of the HTML document`,
                 fail: `${scriptName} is not present in the <head> of the HTML document`,
-                warning: false
+                warning: false,
+                docs: 'https://docs.kameleoon.com/user-manual/get-started/web-experimentation-installation-guide'
             },
             {
                 id: 'engine-async',
                 test: kameleoonSnippet.hasAttribute('async'),
                 pass: `${scriptName} has the async attribute on its <script> tag`,
                 fail: `${scriptName} does not have the async attribute on its <script> tag`,
-                warning: false
-            },
-            {
-                id: 'engine-fetchpriority',
-                test: kameleoonSnippet.getAttribute('fetchpriority') === 'high',
-                pass: `${scriptName} has fetchpriority="high" attribute`,
-                fail: `${scriptName} does not have fetchpriority="high" attribute (optional but recommended)`,
-                warning: false
+                warning: false,
+                docs: 'https://docs.kameleoon.com/developer-docs/web-experimentation/implementation-and-deployment/standard-implementation'
             },
             {
                 id: 'antiflicker-presence',
@@ -205,7 +209,8 @@ function runDomTests(antiFlickerRuntime) {
                 debug: antiFlickerSnippets.length === 0 && antiFlickerRuntimeDetected
                     ? `Detected via hydration method (kameleoonQueue/kameleoonDisplayPage globals) — likely a bundled implementation like Next.js`
                     : '',
-                warning: false
+                warning: false,
+                docs: 'https://docs.kameleoon.com/developer-docs/web-experimentation/technical-concepts/flicker-management-and-performance'
             }
         );
 
@@ -219,21 +224,24 @@ function runDomTests(antiFlickerRuntime) {
                     id: 'antiflicker-unique',
                     test: antiFlickerSnippets.length === 1,
                     pass: `Anti-flicker snippet is present only once`,
-                    fail: `Anti-flicker snippet is not present only once`
+                    fail: `Anti-flicker snippet is not present only once`,
+                    docs: 'https://docs.kameleoon.com/developer-docs/web-experimentation/technical-concepts/flicker-management-and-performance'
                 },
                 {
                     id: 'antiflicker-timeout',
                     test: !isNaN(parsedTimeout) && parsedTimeout <= 1000,
                     pass: `Anti-flicker timeout is under or equal to 1000ms`,
                     fail: isNaN(parsedTimeout) ? `Anti-flicker timeout value could not be parsed` : `Anti-flicker timeout is too high (> 1000ms)`,
-                    debug: rawTimeout ? `Detected value: ${rawTimeout}${rawTimeout !== String(parsedTimeout) && !isNaN(parsedTimeout) ? ` (${parsedTimeout}ms)` : 'ms'}` : ''
+                    debug: rawTimeout ? `Detected value: ${rawTimeout}${rawTimeout !== String(parsedTimeout) && !isNaN(parsedTimeout) ? ` (${parsedTimeout}ms)` : 'ms'}` : '',
+                    docs: 'https://docs.kameleoon.com/developer-docs/web-experimentation/technical-concepts/flicker-management-and-performance'
                 },
                 {
                     id: 'antiflicker-order',
                     test: antiFlickerSnippets[0]?.compareDocumentPosition(kameleoonSnippet) === 4,
                     pass: `Anti-flicker snippet appears before ${scriptName}`,
                     fail: `Anti-flicker snippet does not appear before ${scriptName}`,
-                    warning: false
+                    warning: false,
+                    docs: 'https://docs.kameleoon.com/developer-docs/web-experimentation/implementation-and-deployment/standard-implementation'
                 }
             );
         }
@@ -433,11 +441,19 @@ function isAllowed(domain, directive, parsedCsp) {
 }
 
 function runPerformanceTests() {
+    // Bundled/hydration-sensitive implementations load engine.js via
+    // <link rel="preload" as="script"> and insert the <script> tag afterwards,
+    // so the browser attributes the actual network fetch to the preload
+    // (initiatorType 'link'), not to the script tag itself.
     const resourceTiming = window.performance.getEntriesByType('resource').find(resource =>
-        resource.initiatorType === 'script' && (resource.name.includes('engine.js') || resource.name.includes('kameleoon.js'))
+        (resource.initiatorType === 'script' || resource.initiatorType === 'link') &&
+        (resource.name.includes('engine.js') || resource.name.includes('kameleoon.js'))
     );
 
     if (!resourceTiming) return null;
+
+    const kameleoonSnippet = document.querySelector('script[src*="engine.js"]') || document.querySelector('script[src*="kameleoon.js"]');
+    const scriptName = kameleoonSnippet && kameleoonSnippet.src.includes('engine.js') ? 'engine.js' : 'kameleoon.js';
 
     return {
         duration: Math.round(resourceTiming.duration || 0),
@@ -445,6 +461,8 @@ function runPerformanceTests() {
         startTime: Math.round(resourceTiming.startTime || 0),
         requestStart: Math.round(resourceTiming.requestStart || 0),
         responseStart: Math.round(resourceTiming.responseStart || 0),
-        fetchStart: Math.round(resourceTiming.fetchStart || 0)
+        fetchStart: Math.round(resourceTiming.fetchStart || 0),
+        scriptName,
+        hasFetchPriority: kameleoonSnippet ? kameleoonSnippet.getAttribute('fetchpriority') === 'high' : null
     };
 }

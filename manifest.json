@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Kameleoon Installation Checker (Unofficial)",
+  "name": "A/B check for Kameleoon (Unofficial)",
   "version": "1.0.0",
   "description": "Unofficial tool to check and validate Kameleoon snippet installation on websites.",
   "permissions": [

@@ -52,11 +52,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const results = message.results;
     const storageUpdate = {};
     storageUpdate[`results_${tabId}`] = results;
-    
-    // When saving results, we also clear the pending status for this tab
-    chrome.storage.local.remove([`pending_${tabId}`, `timestamp_${tabId}`], () => {
-        chrome.storage.local.set(storageUpdate);
-    });
+
+    if (message.isFinal) {
+      // Only a genuine Kameleoon detection clears the pending status. An
+      // interim/fallback save (e.g. "not found yet") must leave it in place —
+      // otherwise a same-origin navigation afterwards (like a Shopify
+      // password-gate page redirecting to the real store once unlocked)
+      // won't get re-checked, and the stale "not found" report sticks around
+      // forever even though Kameleoon is present on the page you land on.
+      chrome.storage.local.remove([`pending_${tabId}`, `timestamp_${tabId}`], () => {
+          chrome.storage.local.set(storageUpdate);
+      });
+    } else {
+      chrome.storage.local.set(storageUpdate);
+    }
   }
 
   if (message.action === 'get_tab_status') {

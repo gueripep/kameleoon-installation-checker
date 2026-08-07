@@ -145,12 +145,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 const wasTrueOnLoad = data.consentData.wasTrueOnLoad[test.key];
                 const timeTaken = data.consentData.consentTimes[test.key];
 
-                let status = 'warning';
-                let debug = 'Waiting for consent...';
+                let status = test.key === 'recommendation' ? 'neutral' : 'warning';
+                let debug = test.key === 'recommendation'
+                    ? 'Waiting for consent... (optional module, only relevant if you use Product Recommendation)'
+                    : 'Waiting for consent...';
+
+                let docs = null;
 
                 if (wasTrueOnLoad) {
-                    status = 'fail';
-                    debug = 'Consent was already granted on load (GDPR risk)';
+                    status = 'warning';
+                    debug = 'Consent was already granted on load (GDPR risk in opt-in jurisdictions; legal in opt-out ones like the US)';
+                    docs = 'https://docs.kameleoon.com/developer-docs/privacy-and-compliance/consent-management';
                 } else if (isCurrentlyTrue) {
                     status = 'pass';
                     debug = `Consent granted correctly after ${timeTaken}s`;
@@ -160,38 +165,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 return {
                     status,
                     text: test.text,
-                    debug
+                    debug,
+                    docs
                 };
             });
 
-            // Add JS Cookie Access check
-            if (data.consentData.cookieData) {
-                const cookieData = data.consentData.cookieData;
-                let cookieStatus = 'warning';
-                let cookieDebug = 'Waiting for consent...';
-
-                if (cookieData.foundOnLoad) {
-                    cookieStatus = 'fail';
-                    cookieDebug = 'Privacy Risk: Cookie was accessible in JS BEFORE consent was provided.';
-                } else if (cookieData.currentlyFound) {
-                    cookieStatus = 'pass';
-                    cookieDebug = `Cookie became accessible in JS after ${cookieData.foundAtTime}s (Compliant)`;
-                } else {
-                    const anyConsent = data.consentData.current.experiment || data.consentData.current.personalization || data.consentData.current.recommendation;
-                    if (anyConsent) {
-                        cookieStatus = 'pass';
-                        cookieDebug = 'No kameleoonVisitorCode cookies accessible in JavaScript (Expected if using HttpOnly ITP workaround)';
-                    }
-                }
-
-                consentTests.push({
-                    status: cookieStatus,
-                    text: 'Cookie Access',
-                    debug: cookieDebug
-                });
-            }
-
-            sectionsContainer.appendChild(createSection('Legal Consent Check', consentTests, item => item.text, item => item.status, item => item.debug));
+            sectionsContainer.appendChild(createSection('Legal Consent Check', consentTests, item => item.text, item => item.status, item => item.debug, item => item.docs));
         }
 
         // 2. ITP Workaround (Moved up)
@@ -209,16 +188,71 @@ document.addEventListener('DOMContentLoaded', () => {
                 itpDebug = 'The kameleoonVisitorCode was successfully detected in Set-Cookie headers and is compliant with consent requirements.';
             }
         } else if (isFreshReport) {
-            itpDebug = 'Waiting for consent...';
+            itpDebug = 'Checking for a server-set kameleoonVisitorCode cookie (Set-Cookie header)...';
         }
 
         const itpTests = [
             {
                 status: itpStatus,
                 text: 'ITP Workaround (Set-Cookie)',
-                debug: itpDebug
+                debug: itpDebug,
+                docs: 'https://docs.kameleoon.com/developer-docs/web-experimentation/technical-concepts/itp-management'
             }
         ];
+
+        // Add JS Cookie Access check
+        if (data.consentData?.cookieData) {
+            const wasTrueOnLoad = data.consentData.wasTrueOnLoad || {};
+            const anyConsentGrantedOnLoad = wasTrueOnLoad.experiment || wasTrueOnLoad.personalization || wasTrueOnLoad.recommendation;
+
+            if (!anyConsentGrantedOnLoad) {
+                const cookieData = data.consentData.cookieData;
+                const anyConsentNow = data.consentData.current.experiment || data.consentData.current.personalization || data.consentData.current.recommendation;
+                let cookieStatus = 'warning';
+                let cookieDebug = 'Waiting for consent...';
+
+                // Once the cookie becomes accessible, give consent a 2s grace
+                // window to show up before treating the lack of it as a real
+                // privacy risk — this avoids flagging normal banner/init timing.
+                const WAIT_MS = 2000;
+
+                if (cookieData.currentlyFound) {
+                    const timeSinceCookieFound = cookieData.foundAtTimestamp ? (Date.now() - cookieData.foundAtTimestamp) : Infinity;
+
+                    if (timeSinceCookieFound < WAIT_MS) {
+                        cookieStatus = 'warning';
+                        cookieDebug = 'Cookie is accessible — confirming consent timing...';
+                        // Re-render once the 2s grace window has passed
+                        setTimeout(() => {
+                            if (currentTabId) {
+                                const resultsKey = `results_${currentTabId}`;
+                                chrome.storage.local.get([resultsKey], (res) => {
+                                    if (res[resultsKey]) showResults(res[resultsKey]);
+                                });
+                            }
+                        }, WAIT_MS - timeSinceCookieFound + 100);
+                    } else if (!anyConsentNow) {
+                        cookieStatus = 'fail';
+                        cookieDebug = `Privacy Risk: Cookie is accessible in JS with no consent granted for Experiment, Personalization, or Product Recommendation — the backend is very likely sending the cookie before consent.`;
+                    } else {
+                        cookieStatus = 'pass';
+                        cookieDebug = `Cookie became accessible in JS after ${cookieData.foundAtTime}s (Compliant)`;
+                    }
+                } else if (anyConsentNow) {
+                    cookieStatus = 'pass';
+                    cookieDebug = 'No kameleoonVisitorCode cookies accessible in JavaScript (Expected if using HttpOnly ITP workaround)';
+                }
+
+                itpTests.push({
+                    status: cookieStatus,
+                    text: 'Cookie Access',
+                    debug: cookieDebug,
+                    docs: cookieStatus !== 'pass'
+                        ? 'https://docs.kameleoon.com/developer-docs/web-experimentation/technical-concepts/itp-management'
+                        : null
+                });
+            }
+        }
 
         // Only show Single Cookie Check after consent and ITP compliance
         if (data.consentData?.current?.experiment && data.itpData?.status === 'compliant') {
@@ -259,7 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        sectionsContainer.appendChild(createSection('ITP Workaround', itpTests, item => item.text, item => item.status, item => item.debug));
+        sectionsContainer.appendChild(createSection('ITP Workaround', itpTests, item => item.text, item => item.status, item => item.debug, item => item.docs || null));
 
         // 3. API Data
         if (data.apiData && data.apiData.length > 0) {
@@ -271,7 +305,8 @@ document.addEventListener('DOMContentLoaded', () => {
             sectionsContainer.appendChild(createSection('DOM Implementation', data.domData,
                 item => item.test ? item.pass : item.fail,
                 item => item.test ? 'pass' : (item.warning ? 'warning' : 'fail'),
-                item => item.debug || ''
+                item => item.debug || '',
+                item => item.docs || null
             ));
         }
 
@@ -280,19 +315,32 @@ document.addEventListener('DOMContentLoaded', () => {
             const perf = data.performanceData;
             const startedAt = perf.requestStart || perf.fetchStart || perf.startTime;
             const totalTime = Math.round(perf.responseEnd);
+            const isFast = totalTime < 1000;
 
             const perfTests = [
                 {
-                    pass: totalTime < 1000,
+                    pass: isFast,
                     text: `engine.js ready at ${totalTime}ms`,
-                    debug: `Started at ${startedAt}ms, Network duration: ${perf.duration}ms. ${totalTime >= 1000 ? 'Warning: Engine loaded too late (>1000ms).' : 'Fast engine initialization.'}`
+                    debug: `Started at ${startedAt}ms, Network duration: ${perf.duration}ms. ${!isFast ? 'Warning: Engine loaded too late (>1000ms).' : 'Fast engine initialization.'}`
                 }
             ];
 
-            sectionsContainer.appendChild(createSection('Performance', perfTests, item => item.text, item => item.pass ? 'pass' : 'warning', item => item.debug));
+            if (perf.hasFetchPriority === false) {
+                perfTests.push({
+                    pass: isFast,
+                    text: `${perf.scriptName} does not have fetchpriority="high" attribute`,
+                    debug: isFast
+                        ? `Non-issue: engine.js already loads in ${totalTime}ms (under 1s), so fetchpriority wouldn't meaningfully speed this up further.`
+                        : `Adding fetchpriority="high" can help ${perf.scriptName} load faster given the current ${totalTime}ms load time.`,
+                    docs: 'https://docs.kameleoon.com/developer-docs/web-experimentation/implementation-and-deployment/standard-implementation'
+                });
+            }
+
+            sectionsContainer.appendChild(createSection('Performance', perfTests, item => item.text, item => item.pass ? 'pass' : 'warning', item => item.debug, item => item.docs || null));
         }
 
         // 6. CSP
+        const CSP_DOCS_URL = 'https://docs.kameleoon.com/developer-docs/web-experimentation/faq#what-are-the-kameleoon-domains-that-i-need-to-whitelist';
         if (data.cspData) {
             if (data.cspData.noCsp) {
                 const cspTests = [{ pass: true, text: 'No CSP detected on this page', debug: 'Site is not restricting resources via CSP.' }];
@@ -307,10 +355,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     return {
                         pass: res.pass,
                         text: `${res.directive}`,
+                        docs: !res.pass ? CSP_DOCS_URL : null,
                         debug: debugMsg
                     };
                 });
-                sectionsContainer.appendChild(createSection('CSP Configuration', cspTests, item => item.text, item => item.pass ? 'pass' : 'fail', item => item.debug));
+                sectionsContainer.appendChild(createSection('CSP Configuration', cspTests, item => item.text, item => item.pass ? 'pass' : 'fail', item => item.debug, item => item.docs || null));
             }
         }
 
@@ -330,7 +379,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01"></path></svg>`;
     }
 
-    function createSection(title, items, getText, getStatus, getDebug) {
+    function getNeutralIcon() {
+        return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle></svg>`;
+    }
+
+    function createSection(title, items, getText, getStatus, getDebug, getDocs) {
         const section = document.createElement('div');
         section.className = 'section';
 
@@ -343,7 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
         list.className = 'test-list';
 
         items.forEach(item => {
-            const status = getStatus(item); // Expects 'pass', 'fail', or 'warning'
+            const status = getStatus(item); // Expects 'pass', 'fail', 'warning', or 'neutral'
             const testDiv = document.createElement('div');
             testDiv.className = 'test-item';
 
@@ -351,6 +404,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (status === 'pass') icon = getPassIcon();
             else if (status === 'fail') icon = getFailIcon();
             else if (status === 'warning') icon = getWarningIcon();
+            else if (status === 'neutral') icon = getNeutralIcon();
+
+            // Only surface a docs link when there's actually an issue to act on
+            const docsUrl = getDocs && status !== 'pass' ? getDocs(item) : null;
 
             testDiv.innerHTML = `
                 <div class="test-icon ${status}">
@@ -359,6 +416,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="test-content">
                     <div class="test-title">${getText(item)}</div>
                     ${getDebug(item) ? `<div class="test-debug">${getDebug(item)}</div>` : ''}
+                    ${docsUrl ? `<a class="test-doclink" href="${docsUrl}" target="_blank" rel="noopener noreferrer">View documentation →</a>` : ''}
                 </div>
             `;
             list.appendChild(testDiv);

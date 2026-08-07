@@ -1,4 +1,4 @@
-# Kameleoon Installation Checker (Unofficial) — Chrome Extension
+# A/B check for Kameleoon (Unofficial) — Chrome Extension
 
 An aesthetic, powerful Chrome extension designed to automatically test and validate Kameleoon script deployments directly in the browser.
 

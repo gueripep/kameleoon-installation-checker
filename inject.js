@@ -91,6 +91,7 @@
     let cookieFoundOnLoad = false;
     let cookieCurrentlyFound = false;
     let cookieFoundAtTime = null;
+    let cookieFoundAtTimestamp = null;
     let cookieCount = 0;
 
     function checkCookie() {
@@ -104,6 +105,7 @@
         }
         if (found && !cookieCurrentlyFound) {
             cookieFoundAtTime = Math.round((Date.now() - loadTime) / 1000);
+            cookieFoundAtTimestamp = Date.now();
         }
         cookieCurrentlyFound = found;
         return found;
@@ -172,6 +174,7 @@
                         foundOnLoad: cookieFoundOnLoad,
                         currentlyFound: cookieCurrentlyFound,
                         foundAtTime: cookieFoundAtTime,
+                        foundAtTimestamp: cookieFoundAtTimestamp,
                         count: cookieCount
                     }
                 }
