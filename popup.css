@@ -101,6 +101,7 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 .container {
+    min-height: 100%;
     padding: 20px;
     display: flex;
     flex-direction: column;
@@ -174,6 +175,8 @@ header {
 /* ===== Main ===== */
 main {
     flex-grow: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 .hidden {
@@ -186,7 +189,7 @@ main {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 300px;
+    flex-grow: 1;
     color: var(--text-secondary);
     text-align: center;
     border: 2px dashed var(--border-strong);
