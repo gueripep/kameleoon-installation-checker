@@ -46,18 +46,78 @@
         return apiResults;
     }
 
+    // An engine that loads but never finishes initializing (no visitor code, no
+    // runtime) used to leave this poll running forever, so no KAMELEOON_API_DATA
+    // ever reached the content script and the popup span its spinner with no
+    // report. After STALL_TIMEOUT_MS we publish whatever state we can see, and
+    // keep polling so a genuinely late initialization still overwrites it.
+    // Kept below the content script's own 8s fallback so the richer report wins.
+    const STALL_TIMEOUT_MS = 7000;
+    const scriptStart = Date.now();
     let apiDataSent = false;
+    let stalledReportSent = false;
+
+    function registrableDomain(hostname) {
+        const parts = hostname.split('.');
+        return parts.length > 2 ? parts.slice(-2).join('.') : hostname;
+    }
+
+    function buildStalledReport() {
+        const visitor = window.Kameleoon?.API?.Visitor;
+        const internals = window.Kameleoon?.Internals;
+        const results = [];
+
+        results.push(visitor?.code
+            ? { pass: true, message: 'Kameleoon.API.Visitor.code is defined' }
+            : { pass: false, message: 'Kameleoon.API.Visitor.code is never assigned - the engine loaded but did not finish initializing' });
+
+        results.push(internals?.configuration
+            ? { pass: true, message: 'Kameleoon.Internals.configuration is present' }
+            : { pass: false, message: 'Kameleoon.Internals.configuration is missing' });
+
+        results.push(internals?.runtime
+            ? { pass: true, message: 'Kameleoon.Internals.runtime is present' }
+            : { pass: false, message: 'Kameleoon.Internals.runtime is missing (the engine never reached the targeting stage)' });
+
+        // Wide domain support hands the visitor code over through an iframe. When
+        // that iframe is hosted on a different registrable domain than the page
+        // (a staging/preview host, typically), the handshake can't complete and
+        // the engine stalls in exactly this state.
+        const iframeURL = window.kameleoonIframeURL;
+        if (!visitor?.code && internals?.configuration?.useWideDomainSupport && iframeURL) {
+            try {
+                const iframeDomain = registrableDomain(new URL(iframeURL, location.href).hostname);
+                if (iframeDomain !== registrableDomain(location.hostname)) {
+                    results.push({
+                        pass: false,
+                        message: `Wide domain support iframe (${iframeURL}) is hosted on a different domain than this page - the visitor code handshake cannot complete here`
+                    });
+                }
+            } catch (e) {}
+        }
+
+        return results;
+    }
+
+    function publishApiData(payload) {
+        window.postMessage({ type: 'KAMELEOON_API_DATA', payload, antiFlickerRuntime }, '*');
+    }
+
     function pollKameleoonApi() {
         if (apiDataSent) return;
 
         const apiResults = checkKameleoonApi();
         if (apiResults) {
-            window.postMessage({
-                type: 'KAMELEOON_API_DATA',
-                payload: apiResults,
-                antiFlickerRuntime
-            }, '*');
+            publishApiData(apiResults);
             apiDataSent = true;
+            return;
+        }
+
+        // Only report a stall once the engine is actually on the page - a page
+        // with no Kameleoon at all is the content script fallback's job.
+        if (!stalledReportSent && window.Kameleoon && (Date.now() - scriptStart) >= STALL_TIMEOUT_MS) {
+            stalledReportSent = true;
+            publishApiData(buildStalledReport());
         }
     }
 

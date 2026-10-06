@@ -40,12 +40,17 @@ chrome.runtime.sendMessage({ action: 'get_tab_status' }, (response) => {
         // This doesn't preclude a correct report later: the KAMELEOON_API_DATA
         // listener below keeps running and will overwrite this with full data
         // the moment Kameleoon actually loads, however late that happens.
-        checkTimeout = setTimeout(() => {
+        checkTimeout = setTimeout(async () => {
             if (chrome.runtime.id) {
                 if (!finalReport.apiData || finalReport.apiData.length === 0) {
-                    finalReport.timestamp = Date.now();
                     finalReport.domData = runDomTests();
                     finalReport.performanceData = runPerformanceTests();
+                    // Run the CSP checks here too: they don't depend on the
+                    // engine having initialized, and leaving them out is why the
+                    // CSP section went missing whenever this fallback was the
+                    // report the popup ended up rendering.
+                    finalReport.cspData = await runCspTests();
+                    finalReport.timestamp = Date.now();
                     saveReport(false);
                 }
             }

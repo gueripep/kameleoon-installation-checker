@@ -36,7 +36,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Consider a check stale if it's older than 2 minutes
                 const isStale = checkTimestamp && (now - checkTimestamp) > 120000;
 
-                if (pendingCheck && !isStale && pendingCheck === currentOrigin) {
+                // A report with a timestamp is a complete one (full or fallback).
+                // Once we have that, never go back to the spinner even if the
+                // pending flag is still set - it deliberately survives a
+                // non-final save so a later same-origin navigation gets
+                // re-checked, and treating it as "still running" is what made
+                // the popup spin forever on pages where the engine loads but
+                // never initializes.
+                const hasReport = lastTestResults && lastTestResults.timestamp;
+
+                if (pendingCheck && !isStale && pendingCheck === currentOrigin && !hasReport) {
                     showLoading(checkTimestamp);
                 } else {
                     // If we were showing a pending check but it's stale or mismatched, clear it
@@ -447,7 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const pendingKey = `pending_${currentTabId}`;
             const resultsKey = `results_${currentTabId}`;
             chrome.storage.local.get([pendingKey, resultsKey], (data) => {
-                if (!data[pendingKey] && data[resultsKey]) {
+                if (data[resultsKey] && (!data[pendingKey] || data[resultsKey].timestamp)) {
                     showResults(data[resultsKey]);
                 }
             });
