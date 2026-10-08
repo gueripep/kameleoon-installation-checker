@@ -1,14 +1,12 @@
 {
   "manifest_version": 3,
   "name": "A/B check for Kameleoon (Unofficial)",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Unofficial tool to check and validate Kameleoon snippet installation on websites.",
   "permissions": [
-    "activeTab",
     "tabs",
     "storage",
     "browsingData",
-    "scripting",
     "webRequest"
   ],
   "host_permissions": [
@@ -44,8 +42,12 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["inject.js"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "inject.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 }

@@ -161,7 +161,6 @@ function runDomTests(antiFlickerRuntime) {
 
     const antiFlickerRuntimeDetected = !!antiFlickerRuntime && (
         antiFlickerRuntime.hasStartLoadTime ||
-        antiFlickerRuntime.hasQueue ||
         antiFlickerRuntime.hasDisplayPageFn ||
         antiFlickerRuntime.hasTimeoutHandle
     );
@@ -212,7 +211,7 @@ function runDomTests(antiFlickerRuntime) {
                 pass: `Anti-flicker snippet is present on page`,
                 fail: `Anti-flicker snippet is not present on page`,
                 debug: antiFlickerSnippets.length === 0 && antiFlickerRuntimeDetected
-                    ? `Detected via hydration method (kameleoonQueue/kameleoonDisplayPage globals) — likely a bundled implementation like Next.js`
+                    ? `Detected via hydration method (kameleoonStartLoadTime/kameleoonDisplayPage globals) — likely a bundled implementation like Next.js`
                     : '',
                 warning: false,
                 docs: 'https://docs.kameleoon.com/developer-docs/web-experimentation/technical-concepts/flicker-management-and-performance'

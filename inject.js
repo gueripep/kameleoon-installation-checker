@@ -10,7 +10,6 @@
     // a runtime fallback signal that anti-flicker ran.
     const antiFlickerRuntime = {
         hasStartLoadTime: typeof window.kameleoonStartLoadTime !== 'undefined',
-        hasQueue: Array.isArray(window.kameleoonQueue),
         hasDisplayPageFn: typeof window.kameleoonDisplayPage !== 'undefined',
         hasTimeoutHandle: typeof window.kameleoonDisplayPageTimeOut !== 'undefined'
     };

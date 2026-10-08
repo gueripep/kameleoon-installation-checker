@@ -1,6 +1,6 @@
 # Privacy Policy — A/B check for Kameleoon (Unofficial)
 
-Last updated: 2026-08-07
+Last updated: 2026-10-08
 
 A/B check for Kameleoon (Unofficial) is a Chrome extension that checks whether the Kameleoon snippet is correctly installed and configured on the current webpage (script loading, anti-flicker snippet, CSP headers, execution permissions, load performance).
 
@@ -17,11 +17,10 @@ A/B check for Kameleoon (Unofficial) is a Chrome extension that checks whether t
 
 ## Permissions
 
-- `activeTab` / `tabs`: to run checks on the page you're currently viewing and manage per-tab state.
-- `scripting`: to inject the diagnostic script that inspects the page.
-- `webRequest`: to inspect response headers (e.g. Content-Security-Policy) relevant to the Kameleoon snippet.
+- `tabs`: to find the active tab, reload it for the check, and clean up per-tab state when the tab is closed.
+- `webRequest`: read-only listener on response headers, used only to check Set-Cookie headers for the `kameleoonVisitorCode` cookie (Kameleoon's ITP workaround). Requests are never blocked or modified, and results are stored locally per tab.
 - `storage`: to save check results locally between the check and the popup displaying them.
-- `browsingData`: used only to clear cached data for the current site when re-running a check, so results reflect a clean reload.
+- `browsingData`: used only to clear the tested site's cache, cookies, and site storage (local storage, IndexedDB, service workers) right before the check reloads the page, so results reflect a first visit. Limited to that one origin; no other site's data is touched.
 - Host permissions (`<all_urls>`): required because the extension must be able to run its check on any site the user chooses to test.
 
 ## Contact
